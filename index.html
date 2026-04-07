@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>חשבון חכם | AI Bill Analyzer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --card: #16161f;
+    --border: #252535;
+    --accent: #f0c040;
+    --accent2: #e05c3a;
+    --text: #e8e8f0;
+    --muted: #6666aa;
+    --green: #3ae08a;
+    --red: #e03a6a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Heebo', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(240,192,64,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(240,192,64,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .logo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(240,192,64,0.1);
+    border: 1px solid rgba(240,192,64,0.3);
+    border-radius: 100px;
+    padding: 6px 18px;
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-family: 'Space Mono', monospace;
+    margin-bottom: 20px;
+  }
+
+  .logo-badge::before {
+    content: '◆';
+    font-size: 10px;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  h1 {
+    font-size: clamp(32px, 6vw, 52px);
+    font-weight: 900;
+    line-height: 1.1;
+    margin-bottom: 14px;
+  }
+
+  h1 span.highlight {
+    color: var(--accent);
+    position: relative;
+  }
+
+  h1 span.highlight::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    left: 0; right: 0;
+    height: 3px;
+    background: var(--accent2);
+    border-radius: 2px;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 16px;
+    font-weight: 300;
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* Upload Zone */
+  .upload-zone {
+    background: var(--card);
+    border: 2px dashed var(--border);
+    border-radius: 20px;
+    padding: 48px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(240,192,64,0.04);
+    transform: translateY(-2px);
+  }
+
+  .upload-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .upload-icon {
+    font-size: 52px;
+    margin-bottom: 16px;
+    display: block;
+    filter: grayscale(0.3);
+  }
+
+  .upload-zone h3 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .upload-zone p {
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .upload-zone .file-types {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* Bill type selector */
+  .bill-types {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .bill-type-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Heebo', sans-serif;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .bill-type-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .bill-type-btn.selected {
+    background: rgba(240,192,64,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .bill-type-btn .icon { font-size: 24px; display: block; margin-bottom: 6px; }
+
+  /* Analyze Button */
+  .analyze-btn {
+    width: 100%;
+    padding: 18px;
+    background: var(--accent);
+    color: #0a0a0f;
+    border: none;
+    border-radius: 14px;
+    font-size: 18px;
+    font-weight: 900;
+    font-family: 'Heebo', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    letter-spacing: 0.5px;
+  }
+
+  .analyze-btn:hover:not(:disabled) {
+    background: #ffd060;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(240,192,64,0.3);
+  }
+
+  .analyze-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Preview */
+  #preview-container {
+    display: none;
+    margin-bottom: 20px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    position: relative;
+  }
+
+  #preview-container img {
+    width: 100%;
+    max-height: 280px;
+    object-fit: cover;
+    display: block;
+  }
+
+  .preview-overlay {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(10,10,15,0.9));
+    padding: 20px 16px 14px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  /* Loading */
+  #loading {
+    display: none;
+    text-align: center;
+    padding: 60px 20px;
+  }
+
+  .scanner {
+    width: 80px;
+    height: 80px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 20px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .loading-step {
+    font-size: 14px;
+    color: var(--muted);
+    opacity: 0;
+    animation: fadeIn 0.5s forwards;
+  }
+
+  .loading-step.active { color: var(--accent); opacity: 1; }
+
+  @keyframes fadeIn { to { opacity: 1; } }
+
+  /* Results */
+  #results { display: none; }
+
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .results-title {
+    font-size: 22px;
+    font-weight: 800;
+  }
+
+  .score-badge {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 6px 18px;
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+  }
+
+  .score-badge.bad { border-color: var(--red); color: var(--red); }
+  .score-badge.medium { border-color: var(--accent); color: var(--accent); }
+  .score-badge.good { border-color: var(--green); color: var(--green); }
+
+  /* Section cards */
+  .result-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 16px;
+    animation: slideUp 0.4s ease both;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-section:nth-child(2) { animation-delay: 0.1s; }
+  .result-section:nth-child(3) { animation-delay: 0.2s; }
+  .result-section:nth-child(4) { animation-delay: 0.3s; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .section-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .section-icon.red { background: rgba(224,58,106,0.15); }
+  .section-icon.yellow { background: rgba(240,192,64,0.15); }
+  .section-icon.green { background: rgba(58,224,138,0.15); }
+  .section-icon.blue { background: rgba(58,130,224,0.15); }
+
+  .section-title {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .section-subtitle {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* Issue items */
+  .issue-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+  }
+
+  .issue-item:last-child { border-bottom: none; padding-bottom: 0; }
+
+  .issue-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+
+  .issue-dot.red { background: var(--red); }
+  .issue-dot.yellow { background: var(--accent); }
+  .issue-dot.green { background: var(--green); }
+
+  .issue-content { flex: 1; }
+
+  .issue-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .issue-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .issue-amount {
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--red);
+    white-space: nowrap;
+  }
+
+  .issue-amount.save { color: var(--green); }
+
+  /* Plans grid */
+  .plans-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  .plan-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.2s;
+  }
+
+  .plan-card:hover { border-color: var(--accent); }
+
+  .plan-card.recommended {
+    border-color: var(--green);
+    background: rgba(58,224,138,0.04);
+    position: relative;
+  }
+
+  .plan-card.recommended::before {
+    content: '✦ מומלץ';
+    position: absolute;
+    top: -10px;
+    right: 12px;
+    background: var(--green);
+    color: #0a0a0f;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 100px;
+    font-family: 'Heebo', sans-serif;
+  }
+
+  .plan-name {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .plan-price {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
+  .plan-price span { font-size: 13px; color: var(--muted); }
+
+  .plan-features {
+    list-style: none;
+    margin-top: 10px;
+  }
+
+  .plan-features li {
+    font-size: 12px;
+    color: var(--muted);
+    padding: 3px 0;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .plan-features li::before { content: '›'; color: var(--accent); }
+
+  /* Summary bar */
+  .summary-bar {
+    background: linear-gradient(135deg, rgba(58,224,138,0.08), rgba(240,192,64,0.08));
+    border: 1px solid rgba(58,224,138,0.25);
+    border-radius: 14px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .summary-label {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .summary-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--green);
+  }
+
+  /* Reset btn */
+  .reset-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-family: 'Heebo', sans-serif;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+
+  .reset-btn:hover { border-color: var(--text); color: var(--text); }
+
+  /* Error */
+  .error-box {
+    background: rgba(224,58,106,0.08);
+    border: 1px solid rgba(224,58,106,0.3);
+    border-radius: 12px;
+    padding: 16px 20px;
+    color: var(--red);
+    font-size: 14px;
+    display: none;
+    margin-top: 16px;
+  }
+
+  /* Disclaimer */
+  .disclaimer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 32px;
+    line-height: 1.6;
+    opacity: 0.6;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo-badge">AI BILL ANALYZER</div>
+    <h1>בודק <span class="highlight">חשבון חכם</span></h1>
+    <p class="subtitle">העלה חשבונית — הבינה המלאכותית תבדוק אם חייבו אותך יותר מדי, תמצא חיובים מיותרים ותציע חבילות טובות יותר.</p>
+  </header>
+
+  <!-- Upload section -->
+  <div id="upload-section">
+
+    <div class="bill-types">
+      <button class="bill-type-btn selected" data-type="cellular" onclick="selectType(this)">
+        <span class="icon">📱</span> סלולר
+      </button>
+      <button class="bill-type-btn" data-type="electric" onclick="selectType(this)">
+        <span class="icon">⚡</span> חשמל
+      </button>
+      <button class="bill-type-btn" data-type="water" onclick="selectType(this)">
+        <span class="icon">💧</span> מים
+      </button>
+      <button class="bill-type-btn" data-type="internet" onclick="selectType(this)">
+        <span class="icon">🌐</span> אינטרנט
+      </button>
+      <button class="bill-type-btn" data-type="insurance" onclick="selectType(this)">
+        <span class="icon">🛡️</span> ביטוח
+      </button>
+      <button class="bill-type-btn" data-type="other" onclick="selectType(this)">
+        <span class="icon">📄</span> אחר
+      </button>
+    </div>
+
+    <div class="upload-zone" id="upload-zone">
+      <input type="file" id="file-input" accept="image/*,.pdf" onchange="handleFile(event)">
+      <span class="upload-icon">📋</span>
+      <h3>גרור לכאן את החשבונית שלך</h3>
+      <p>או לחץ לבחירת קובץ</p>
+      <div class="file-types">
+        <span class="tag">JPG</span>
+        <span class="tag">PNG</span>
+        <span class="tag">PDF</span>
+        <span class="tag">HEIC</span>
+      </div>
+    </div>
+
+    <div id="preview-container">
+      <img id="preview-img" src="" alt="חשבונית">
+      <div class="preview-overlay" id="preview-name"></div>
+    </div>
+
+    <div style="margin-bottom:12px;"><input type="password" id="api-key-input" placeholder="🔑 הכנס Google Gemini API Key שלך" oninput="checkReady()" style="width:100%;padding:14px 16px;background:var(--card);border:1px solid var(--border);border-radius:12px;color:var(--text);font-family:Heebo,sans-serif;font-size:15px;outline:none;direction:ltr;text-align:right;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"><p style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center;">המפתח לא נשמר ולא נשלח לשום מקום · חינמי דרך Google AI Studio</p></div>
+    <button class="analyze-btn" id="analyze-btn" onclick="analyze()" disabled>
+      <span>🔍</span> נתח את החשבונית
+    </button>
+
+    <div class="error-box" id="error-box"></div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading">
+    <div class="scanner"></div>
+    <p style="font-size:18px; font-weight:700; margin-bottom:20px;">מנתח את החשבונית שלך...</p>
+    <div class="loading-steps">
+      <div class="loading-step" id="step1">📖 קורא את הנתונים בחשבונית...</div>
+      <div class="loading-step" id="step2">🔍 מחפש חיובים מיותרים...</div>
+      <div class="loading-step" id="step3">📊 מחשב חיסכון פוטנציאלי...</div>
+      <div class="loading-step" id="step4">💡 מחפש חבילות טובות יותר...</div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results"></div>
+
+  <p class="disclaimer">* הניתוח נועד לסיוע כללי בלבד ואינו מהווה ייעוץ פיננסי. המחירים המוצגים הם הערכה בלבד.</p>
+
+</div>
+
+<script>
+let selectedFile = null;
+let apiKey = "";
+let selectedType = 'cellular';
+let imageBase64 = null;
+
+function selectType(btn) {
+  document.querySelectorAll('.bill-type-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedType = btn.dataset.type;
+}
+
+function checkReady() {
+  apiKey = document.getElementById("api-key-input").value.trim();
+  document.getElementById("analyze-btn").disabled = !(imageBase64 && apiKey);
+}
+
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  loadFile(file);
+}
+
+function loadFile(file) {
+  selectedFile = file;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    imageBase64 = e.target.result;
+    // Show preview
+    if (file.type.startsWith('image/')) {
+      document.getElementById('preview-img').src = imageBase64;
+      document.getElementById('preview-container').style.display = 'block';
+    }
+    document.getElementById('preview-name').textContent = '📎 ' + file.name + ' (' + (file.size / 1024).toFixed(0) + ' KB)';
+    checkReady();
+  };
+  reader.readAsDataURL(file);
+}
+
+// Drag & drop
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) loadFile(file);
+});
+
+const typeLabels = {
+  cellular: 'סלולר', electric: 'חשמל', water: 'מים / מי עדן',
+  internet: 'אינטרנט', insurance: 'ביטוח', other: 'שירות כללי'
+};
+
+async function analyze() {
+  if (!imageBase64) return;
+
+  document.getElementById('upload-section').style.display = 'none';
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('error-box').style.display = 'none';
+
+  // Animate loading steps
+  const steps = ['step1','step2','step3','step4'];
+  steps.forEach((s, i) => {
+    setTimeout(() => {
+      document.getElementById(s).classList.add('active');
+    }, i * 1200);
+  });
+
+  try {
+    const base64Data = imageBase64.split(',')[1];
+    const mediaType = imageBase64.split(';')[0].split(':')[1] || 'image/jpeg';
+
+    const systemPrompt = `אתה מומחה ישראלי לניתוח חשבוניות ותעריפים. 
+תפקידך לנתח חשבוניות של שירותים ישראליים (סלולר, חשמל, מים, אינטרנט, ביטוח, מי עדן וכד') ולמצוא:
+1. חיובים מיותרים או יקרים מדי
+2. אותיות קטנות חשובות
+3. חבילות תמחור משופרות
+
+החזר תשובה אך ורק כ-JSON תקין בלי backticks, בפורמט הבא:
+{
+  "billSummary": {
+    "provider": "שם הספק",
+    "billType": "סוג החשבון",
+    "totalAmount": "סכום כולל בש\"ח",
+    "billingPeriod": "תקופת חיוב",
+    "score": "bad|medium|good",
+    "scoreLabel": "תיאור הציון"
+  },
+  "redFlags": [
+    { "title": "שם הבעיה", "description": "הסבר", "amount": "סכום ₪ (אם רלוונטי)" }
+  ],
+  "hiddenCharges": [
+    { "title": "חיוב", "description": "הסבר", "amount": "₪X" }
+  ],
+  "betterPlans": [
+    { "name": "שם חבילה", "provider": "ספק", "price": "מחיר חודשי", "features": ["פיצ'ר 1", "פיצ'ר 2", "פיצ'ר 3"], "recommended": true|false }
+  ],
+  "totalPotentialSaving": "X ₪ לחודש",
+  "topTip": "טיפ מרכזי אחד בשורה אחת"
+}
+אם לא ניתן לקרוא את החשבונית בבירור, נסה לנתח לפי מה שרואים ורשום הערות.`;
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+    const response = await fetch(geminiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{
+          parts: [
+            { inline_data: { mime_type: mediaType, data: base64Data } },
+            { text: `נתח את החשבונית הזו. סוג השירות שנבחר: ${typeLabels[selectedType]}. אם זוהי חשבונית אחרת, נתח לפי מה שמופיע בה. החזר JSON בלבד.` }
+          ]
+        }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 1500 }
+      })
+    });
+
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message);
+    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    text = text.replace(/```json|```/g, '').trim();
+
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch(e) {
+      // Try to extract JSON
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) parsed = JSON.parse(match[0]);
+      else throw new Error('לא ניתן לפרש את התשובה');
+    }
+
+    document.getElementById('loading').style.display = 'none';
+    showResults(parsed);
+
+  } catch(err) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('upload-section').style.display = 'block';
+    const errBox = document.getElementById('error-box');
+    errBox.style.display = 'block';
+    errBox.textContent = '⚠️ שגיאה בניתוח: ' + err.message + '. אנא נסה שוב.';
+  }
+}
+
+function showResults(data) {
+  const r = document.getElementById('results');
+  r.style.display = 'block';
+
+  const { billSummary, redFlags, hiddenCharges, betterPlans, totalPotentialSaving, topTip } = data;
+
+  const scoreClass = billSummary.score === 'bad' ? 'bad' : billSummary.score === 'medium' ? 'medium' : 'good';
+  const scoreEmoji = billSummary.score === 'bad' ? '🔴' : billSummary.score === 'medium' ? '🟡' : '🟢';
+
+  let html = `
+    <div class="results-header">
+      <div>
+        <div class="results-title">📊 ניתוח חשבונית — ${billSummary.provider || 'לא זוהה'}</div>
+        <div style="color:var(--muted);font-size:13px;margin-top:4px;">${billSummary.billType || ''} · ${billSummary.billingPeriod || ''}</div>
+      </div>
+      <div class="score-badge ${scoreClass}">${scoreEmoji} ${billSummary.scoreLabel || billSummary.score}</div>
+    </div>
+  `;
+
+  // Summary saving bar
+  if (totalPotentialSaving) {
+    html += `
+      <div class="summary-bar">
+        <div>
+          <div class="summary-label">סכום חשבון נוכחי</div>
+          <div class="summary-value">${billSummary.totalAmount || '—'}</div>
+        </div>
+        <div style="text-align:center;color:var(--muted);font-size:22px;">→</div>
+        <div>
+          <div class="summary-label">חיסכון פוטנציאלי</div>
+          <div class="summary-value">${totalPotentialSaving}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Top tip
+  if (topTip) {
+    html += `
+      <div class="result-section" style="border-color:rgba(240,192,64,0.3);animation-delay:0s;">
+        <div class="section-header">
+          <div class="section-icon yellow">💡</div>
+          <div><div class="section-title">הטיפ הכי חשוב</div></div>
+        </div>
+        <p style="font-size:15px;line-height:1.6;">${topTip}</p>
+      </div>
+    `;
+  }
+
+  // Red flags
+  if (redFlags && redFlags.length > 0) {
+    html += `
+      <div class="result-section" style="animation-delay:0.1s;">
+        <div class="section-header">
+          <div class="section-icon red">🚨</div>
+          <div>
+            <div class="section-title">בעיות שמצאנו</div>
+            <div class="section-subtitle">${redFlags.length} נושאים שצריך לבדוק</div>
+          </div>
+        </div>
+        ${redFlags.map(f => `
+          <div class="issue-item">
+            <div class="issue-dot red"></div>
+            <div class="issue-content">
+              <div class="issue-title">${f.title}</div>
+              <div class="issue-desc">${f.description}</div>
+            </div>
+            ${f.amount ? `<div class="issue-amount">${f.amount}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  // Hidden charges
+  if (hiddenCharges && hiddenCharges.length > 0) {
+    html += `
+      <div class="result-section" style="animation-delay:0.2s;">
+        <div class="section-header">
+          <div class="section-icon yellow">🔎</div>
+          <div>
+            <div class="section-title">האותיות הקטנות</div>
+            <div class="section-subtitle">חיובים שאולי לא שמת לב אליהם</div>
+          </div>
+        </div>
+        ${hiddenCharges.map(c => `
+          <div class="issue-item">
+            <div class="issue-dot yellow"></div>
+            <div class="issue-content">
+              <div class="issue-title">${c.title}</div>
+              <div class="issue-desc">${c.description}</div>
+            </div>
+            ${c.amount ? `<div class="issue-amount">${c.amount}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  // Better plans
+  if (betterPlans && betterPlans.length > 0) {
+    html += `
+      <div class="result-section" style="animation-delay:0.3s;">
+        <div class="section-header">
+          <div class="section-icon green">🚀</div>
+          <div>
+            <div class="section-title">חבילות טובות יותר</div>
+            <div class="section-subtitle">אלטרנטיבות שכדאי לבדוק</div>
+          </div>
+        </div>
+        <div class="plans-grid">
+          ${betterPlans.map(p => `
+            <div class="plan-card ${p.recommended ? 'recommended' : ''}">
+              <div class="plan-name">${p.name}</div>
+              <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">${p.provider || ''}</div>
+              <div class="plan-price">${p.price}<span>/חודש</span></div>
+              <ul class="plan-features">
+                ${(p.features || []).map(f => `<li>${f}</li>`).join('')}
+              </ul>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  html += `
+    <button class="reset-btn" onclick="resetApp()">← נתח חשבונית אחרת</button>
+  `;
+
+  r.innerHTML = html;
+  r.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function resetApp() {
+  selectedFile = null;
+  imageBase64 = null;
+  document.getElementById('upload-section').style.display = 'block';
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('preview-container').style.display = 'none';
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('file-input').value = '';
+  document.querySelectorAll('.loading-step').forEach(s => s.classList.remove('active'));
+}
+</script>
+</body>
+</html>
